@@ -1,6 +1,6 @@
 # vscode-bigquery
 
-<img src="bigquery-icon.png" width="50px">
+![BigQuery icon](bigquery-icon.png)
 
 A Visual Studio Code ("VS Code") extension that can query Google Cloud Platform's [BigQuery analytics database](https://cloud.google.com/bigquery/) from, and return results to, your editor. This extension allows you to:
 
