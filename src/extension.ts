@@ -23,7 +23,6 @@ let output = vscode.window.createOutputChannel("BigQuery")
 
 export function activate(context: vscode.ExtensionContext) {
   config = readConfig()
-  console.log(config.get("keyFilename"))
 
   let disposable = vscode.commands.registerCommand(
     "extension.runAsQuery",
@@ -53,7 +52,8 @@ function query(queryText: string): Promise<any> {
     email: config.get("email")
   })
 
-  return client
+  let id: string
+  let job = client
     .createQueryJob({
       query: queryText,
       location: config.get("location"),
@@ -62,21 +62,26 @@ function query(queryText: string): Promise<any> {
     })
     .then(data => {
       let job = data[0]
+      id = job.id
       vscode.window.showInformationMessage(`BigQuery job ID: ${job.id}`)
 
-      return {
-        id: job.id,
-        job: job
-          .getQueryResults({
-            autoPaginate: true
-          })
-          .catch(err => {
-            throw new Error(err)
-          })
-      }
+      return job.getQueryResults({
+        autoPaginate: true
+      })
     })
     .catch(err => {
       vscode.window.showErrorMessage(`Failed to query BigQuery: ${err}`)
+      return null
+    })
+
+  return job
+    .then(data => {
+      if (data) {
+        writeResults(id, data[0])
+      }
+    })
+    .catch(err => {
+      vscode.window.showErrorMessage(`Failed to get results: ${err}`)
     })
 }
 
@@ -105,58 +110,43 @@ function getQueryText(
   onlySelected?: boolean
 ): string {
   if (!editor) {
-    vscode.window.showErrorMessage("No active editor window was found")
-    return
+    throw "No active editor window was found"
   }
 
   // Only return the selected text
   if (onlySelected) {
     let selection = editor.selection
     if (selection.isEmpty) {
-      vscode.window.showErrorMessage("No text is currently selected")
-      return
+      throw "No text is currently selected"
     }
 
     return editor.document.getText(selection).trim()
   }
 
-  return editor.document.getText().trim()
+  let text = editor.document.getText().trim()
+  if (!text) {
+    throw "The editor window is empty"
+  }
+
+  return text
 }
 
 function runAsQuery(): void {
-  let queryText = getQueryText(vscode.window.activeTextEditor)
-
-  let id: string
-  query(queryText)
-    .then(res => {
-      id = res.id
-      res.job.then(data => {
-        writeResults(id, data[0])
-      })
-    })
-    .catch(err => {
-      vscode.window.showErrorMessage(
-        `Failed to get results for job ${id}: ${err}`
-      )
-    })
+  try {
+    let queryText = getQueryText(vscode.window.activeTextEditor)
+    query(queryText)
+  } catch (err) {
+    vscode.window.showErrorMessage(err)
+  }
 }
 
 function runSelectedAsQuery(): void {
-  let queryText = getQueryText(vscode.window.activeTextEditor, true)
-
-  let id: string
-  query(queryText)
-    .then(res => {
-      id = res.id
-      res.job.then(data => {
-        writeResults(id, data[0])
-      })
-    })
-    .catch(err => {
-      vscode.window.showErrorMessage(
-        `Failed to get results for job ${id}: ${err}`
-      )
-    })
+  try {
+    let queryText = getQueryText(vscode.window.activeTextEditor, true)
+    query(queryText)
+  } catch (err) {
+    vscode.window.showErrorMessage(err)
+  }
 }
 
 export function deactivate() {}
