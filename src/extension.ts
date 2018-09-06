@@ -12,36 +12,52 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-"use strict"
-import * as vscode from "vscode"
-const BigQuery = require("@google-cloud/bigquery")
-const toCSV = require("csv-stringify")
+"use strict";
+import * as vscode from "vscode";
+const BigQuery = require("@google-cloud/bigquery");
+const toCSV = require("csv-stringify");
+const easyTable = require("easy-table");
+const flatten = require("flat");
 
-const configPrefix = "bigquery"
-let config: vscode.WorkspaceConfiguration
-let output = vscode.window.createOutputChannel("BigQuery")
+const configPrefix = "bigquery";
+let config: vscode.WorkspaceConfiguration;
+let output = vscode.window.createOutputChannel("BigQuery");
 
-export function activate(context: vscode.ExtensionContext) {
-  config = readConfig()
+// CommandMap describes a map of extension commands (defined in package.json)
+// and the function they invoke.
+type CommandMap = Map<string, () => void>;
+let commands: CommandMap = new Map<string, () => void>([
+  ["extension.runAsQuery", runAsQuery],
+  ["extension.runSelectedAsQuery", runSelectedAsQuery]
+]);
 
-  let disposable = vscode.commands.registerCommand(
-    "extension.runAsQuery",
-    runAsQuery
-  )
-  context.subscriptions.push(disposable)
+export function activate(ctx: vscode.ExtensionContext) {
+  config = readConfig();
 
-  disposable = vscode.commands.registerCommand(
-    "extension.runSelectedAsQuery",
-    runSelectedAsQuery
-  )
-  context.subscriptions.push(disposable)
+  // Register all available commands and their actions.
+  commands.forEach((action, name) => {
+    ctx.subscriptions.push(vscode.commands.registerCommand(name, action));
+  });
+
+  // Listen for configuration changes and trigger an update, so that users don't
+  // have to reload the VS Code environment after a config update.
+  ctx.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(event => {
+      if (!event.affectsConfiguration(configPrefix)) {
+        return;
+      }
+
+      config = readConfig();
+    })
+  );
 }
 
+//
 function readConfig(): vscode.WorkspaceConfiguration {
   try {
-    return vscode.workspace.getConfiguration(configPrefix)
+    return vscode.workspace.getConfiguration(configPrefix);
   } catch (e) {
-    console.error(`failed to read config: ${e}`)
+    vscode.window.showErrorMessage(`failed to read config: ${e}`);
   }
 }
 
@@ -50,9 +66,9 @@ function query(queryText: string): Promise<any> {
     keyFilename: config.get("keyFilename"),
     projectId: config.get("projectId"),
     email: config.get("email")
-  })
+  });
 
-  let id: string
+  let id: string;
   let job = client
     .createQueryJob({
       query: queryText,
@@ -61,47 +77,71 @@ function query(queryText: string): Promise<any> {
       useLegacySql: config.get("useLegacySql")
     })
     .then(data => {
-      let job = data[0]
-      id = job.id
-      vscode.window.showInformationMessage(`BigQuery job ID: ${job.id}`)
+      let job = data[0];
+      id = job.id;
+      vscode.window.showInformationMessage(`BigQuery job ID: ${job.id}`);
 
       return job.getQueryResults({
         autoPaginate: true
-      })
+      });
     })
     .catch(err => {
-      vscode.window.showErrorMessage(`Failed to query BigQuery: ${err}`)
-      return null
-    })
+      vscode.window.showErrorMessage(`Failed to query BigQuery: ${err}`);
+      return null;
+    });
 
   return job
     .then(data => {
       if (data) {
-        writeResults(id, data[0])
+        writeResults(id, data[0]);
       }
     })
     .catch(err => {
-      vscode.window.showErrorMessage(`Failed to get results: ${err}`)
-    })
+      vscode.window.showErrorMessage(`Failed to get results: ${err}`);
+    });
 }
 
 function writeResults(jobId: string, rows: Array<any>): void {
-  output.show()
-  output.appendLine(`Results for job ${jobId}:`)
+  output.show();
+  output.appendLine(`Results for job ${jobId}:`);
 
   let format = config
     .get("outputFormat")
     .toString()
-    .toLowerCase()
+    .toLowerCase();
 
   switch (format) {
     case "csv":
       toCSV(rows, (err, res) => {
-        output.appendLine(res)
-      })
-      break
+        output.appendLine(res);
+      });
+
+      break;
+    case "table":
+      let t = new easyTable();
+
+      // Collect the header names; flatten nested objects into a
+      // recordname.recordfield format
+      let headers = [];
+      Object.keys(flatten(rows[0])).forEach(name => headers.push(name));
+
+      rows.forEach((val, idx) => {
+        // Flatten each row, and for each header (name), insert the matching
+        // object property (v[name])
+        let v = flatten(val, { safe: true });
+        headers.forEach((name, col) => {
+          t.cell(name, v[name]);
+        });
+        t.newRow();
+      });
+
+      output.appendLine(t.toString());
+
+      break;
     default:
-      output.appendLine(JSON.stringify(rows))
+      rows.forEach(row => {
+        output.appendLine(JSON.stringify(flatten(row, { safe: true })));
+      });
   }
 }
 
@@ -110,42 +150,42 @@ function getQueryText(
   onlySelected?: boolean
 ): string {
   if (!editor) {
-    throw "No active editor window was found"
+    throw new Error("No active editor window was found");
   }
 
   // Only return the selected text
   if (onlySelected) {
-    let selection = editor.selection
+    let selection = editor.selection;
     if (selection.isEmpty) {
-      throw "No text is currently selected"
+      throw new Error("No text is currently selected");
     }
 
-    return editor.document.getText(selection).trim()
+    return editor.document.getText(selection).trim();
   }
 
-  let text = editor.document.getText().trim()
+  let text = editor.document.getText().trim();
   if (!text) {
-    throw "The editor window is empty"
+    throw new Error("The editor window is empty");
   }
 
-  return text
+  return text;
 }
 
 function runAsQuery(): void {
   try {
-    let queryText = getQueryText(vscode.window.activeTextEditor)
-    query(queryText)
+    let queryText = getQueryText(vscode.window.activeTextEditor);
+    query(queryText);
   } catch (err) {
-    vscode.window.showErrorMessage(err)
+    vscode.window.showErrorMessage(err);
   }
 }
 
 function runSelectedAsQuery(): void {
   try {
-    let queryText = getQueryText(vscode.window.activeTextEditor, true)
-    query(queryText)
+    let queryText = getQueryText(vscode.window.activeTextEditor, true);
+    query(queryText);
   } catch (err) {
-    vscode.window.showErrorMessage(err)
+    vscode.window.showErrorMessage(err);
   }
 }
 

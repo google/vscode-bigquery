@@ -3,7 +3,12 @@
   "displayName": "vscode-bigquery",
   "description": "An extension for querying Google Cloud Platform's BigQuery analytics datasets directly from VS Code.",
   "version": "0.0.1",
-  "publisher": "elithrar",
+  "publisher": "google",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/google/vscode-bigquery.git"
+  },
+  "homepage": "https://github.com/google/vscode-bigquery",
   "engines": {
     "vscode": "^1.26.0"
   },
@@ -46,9 +51,9 @@
           "description": "(Optional) Account email address. Required when using a .pem or .p12 keyFilename."
         },
         "bigquery.useLegacySql": {
-          "type": "string",
-          "default": "",
-          "description": "Specifies whether to use BigQuery's legacy SQL dialect for this query. The default value is true. If set to false, the query will use BigQuery's standard SQL: https://cloud.google.com/bigquery/sql-reference/"
+          "type": "boolean",
+          "default": false,
+          "description": "Specifies whether to use BigQuery's legacy SQL dialect for this query. The default value is false. If set to false, the query will use BigQuery's standard SQL: https://cloud.google.com/bigquery/sql-reference/"
         },
         "bigquery.location": {
           "type": "string",
@@ -56,14 +61,19 @@
           "description": "The geographic location of the job. Required except for US and EU. See details at https://cloud.google.com/bigquery/docs/dataset-locations#specifying_your_location."
         },
         "bigquery.maximumBytesBilled": {
-          "type": "number",
-          "default": null,
+          "type": "integer",
+          "default": 1000000000000,
           "description": "Queries that will have bytes billed beyond this limit will fail (without incurring a charge). If unspecified, this will be set to your project default."
         },
         "bigquery.outputFormat": {
           "type": "string",
           "default": "json",
-          "description": "Controls the output format: accepted values are 'json' and 'csv' (default: 'json')"
+          "enum": [
+            "json",
+            "csv",
+            "table"
+          ],
+          "description": "Controls the output format for query results."
         }
       }
     }
@@ -76,14 +86,16 @@
     "test": "npm run compile && node ./node_modules/vscode/bin/test"
   },
   "devDependencies": {
-    "typescript": "^2.6.1",
-    "vscode": "^1.1.21",
+    "@types/mocha": "^2.2.42",
+    "@types/node": "^8.10.29",
     "tslint": "^5.8.0",
-    "@types/node": "^8.10.25",
-    "@types/mocha": "^2.2.42"
+    "typescript": "^2.6.1",
+    "vscode": "^1.1.21"
   },
   "dependencies": {
     "@google-cloud/bigquery": "^1.3.0",
-    "csv-stringify": "^4.0.0"
+    "csv-stringify": "^4.0.1",
+    "easy-table": "^1.1.1",
+    "flat": "^4.1.0"
   }
 }
