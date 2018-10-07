@@ -74,6 +74,11 @@
             "table"
           ],
           "description": "Controls the output format for query results."
+        },
+        "bigquery.prettyPrintJSON": {
+          "type": "boolean",
+          "default": true,
+          "description": "Pretty print JSON results."
         }
       }
     }

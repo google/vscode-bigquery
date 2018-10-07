@@ -139,8 +139,11 @@ function writeResults(jobId: string, rows: Array<any>): void {
 
       break;
     default:
+      let spacing = config.get("prettyPrintJSON") ? "  " : "";
       rows.forEach(row => {
-        output.appendLine(JSON.stringify(flatten(row, { safe: true })));
+        output.appendLine(
+          JSON.stringify(flatten(row, { safe: true }), null, spacing)
+        );
       });
   }
 }

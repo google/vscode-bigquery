@@ -12,18 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as assert from "assert"
+// import * as assert from "assert";
+// import * as vscode from "vscode";
+// import * as myExtension from "../extension";
+// import * as path from "path";
+//
+// const fixturePath = path.join(__dirname, "..", "..", "test", "fixtures");
 
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
-// import * as vscode from 'vscode';
-// import * as myExtension from '../extension';
+// Test editor <-> query text selection
+suite("Query text tests", function() {
+  // test("Query text is read correctly", () => {
+  //   let uri = vscode.Uri.file(path.join(fixturePath, "test.sql"));
+  //   // call getQueryText(editor, false)
+  //   // check that expectations match via assert.equal
+  // });
+  // test("Query text from a selection matches", function() {
+  //   let uri = vscode.Uri.file(path.join(fixturePath, "test.sql"));
+  //   vscode.workspace.openTextDocument(uri).then(doc => {
+  //     // select the text
+  //     // call getQueryText(editor, true)
+  //     // confirm that selection matches via assert.equal
+  //   });
+  // });
+});
 
-// Defines a Mocha test suite to group tests of similar kind together
-suite("Extension Tests", function() {
-  // Defines a Mocha unit test
-  test("Something 1", function() {
-    assert.equal(-1, [1, 2, 3].indexOf(5))
-    assert.equal(-1, [1, 2, 3].indexOf(0))
-  })
-})
+// Test that results are written correctly (table, CSV, JSON)
+suite("Output results tests", function() {
+  test("JSON output is as expected", () => {
+    // Get query results from fixture
+    // Set config to "json"
+    // Pass to writeResults
+    // Capture output and match via assert.equal
+  });
+});
