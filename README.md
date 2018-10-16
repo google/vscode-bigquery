@@ -10,6 +10,15 @@ A Visual Studio Code ("VS Code") extension that can query Google Cloud Platform'
 
 This extension is great if you're exploring BigQuery and prefer VS Code's editing environment, or for cases where you're writing documentation (hint: use "Run selected text as query") and want to double check that the query is valid.
 
+## Installing
+
+The package will be available on the VS Code Marketplace shortly, but in the meantime, you can install it manually:
+
+1. Download the latest pre-built release here: [vscode-bigquery-0.0.1.vsix](https://github.com/google/vscode-bigquery/releases/download/v0.0.1/vscode-bigquery-0.0.1.vsix)
+2. Open the Command Palette in VS Code (Ctrl/Cmd+Shift+P), and type "ext install" -> select "Extension: Install From VSIX..."
+3. Navigate to the folder where you saved the `.vsix` file, and select it.
+4. Reload VS Code when prompted.
+
 ## Usage
 
 The BigQuery extension adds a number of commands to the command palette (Cmd/Ctrl+Shift+P).
