@@ -92,14 +92,14 @@
   },
   "devDependencies": {
     "@types/mocha": "^2.2.42",
-    "@types/node": "^8.10.29",
+    "@types/node": "^8.10.36",
     "tslint": "^5.8.0",
     "typescript": "^2.6.1",
     "vscode": "^1.1.21"
   },
   "dependencies": {
     "@google-cloud/bigquery": "^1.3.0",
-    "csv-stringify": "^4.0.1",
+    "csv-stringify": "^4.3.1",
     "easy-table": "^1.1.1",
     "flat": "^4.1.0"
   }
