@@ -33,7 +33,7 @@
       },
       {
         "command": "extension.dryRun",
-        "title": "BigQuery: Dry run Query"
+        "title": "BigQuery: Run as Dry Run"
       }
     ],
     "configuration": {

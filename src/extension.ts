@@ -84,13 +84,15 @@ function query(queryText: string, isDryRun?: boolean): Promise<any> {
     })
     .then(data => {
       let job = data[0];
+      id = job.id;
+      const jobIdMessage = `BigQuery job ID: ${job.id}`;
       if (isDryRun) {
-        vscode.window.showInformationMessage(
-            `BigQuery dry run successful. Job ID: ${job.id}`);
+        vscode.window.showInformationMessage(`${jobIdMessage} (dry run)`);
+        let totalBytesProcessed = job.metadata.statistics.totalBytesProcessed;
+        writeDryRunSummary(id, totalBytesProcessed);
         return null;
       }
-      id = job.id;
-      vscode.window.showInformationMessage(`BigQuery job ID: ${job.id}`);
+      vscode.window.showInformationMessage(jobIdMessage);
 
       return job.getQueryResults({
         autoPaginate: true
@@ -157,6 +159,13 @@ function writeResults(jobId: string, rows: Array<any>): void {
         );
       });
   }
+}
+
+function writeDryRunSummary(jobId: string, numBytesProcessed: string) {
+  output.show();
+  output.appendLine(`Results for job ${jobId} (dry run):`);
+  output.appendLine(`Total bytes processed: ${numBytesProcessed}`);
+  output.appendLine(``);
 }
 
 function getQueryText(
