@@ -28,7 +28,8 @@ let output = vscode.window.createOutputChannel("BigQuery");
 type CommandMap = Map<string, () => void>;
 let commands: CommandMap = new Map<string, () => void>([
   ["extension.runAsQuery", runAsQuery],
-  ["extension.runSelectedAsQuery", runSelectedAsQuery]
+  ["extension.runSelectedAsQuery", runSelectedAsQuery],
+  ["extension.dryRun", dryRun]
 ]);
 
 export function activate(ctx: vscode.ExtensionContext) {
@@ -61,7 +62,11 @@ function readConfig(): vscode.WorkspaceConfiguration {
   }
 }
 
-function query(queryText: string): Promise<any> {
+/**
+ * @param queryText
+ * @param isDryRun Defaults to False.
+ */
+function query(queryText: string, isDryRun?: boolean): Promise<any> {
   let client = BigQuery({
     keyFilename: config.get("keyFilename"),
     projectId: config.get("projectId"),
@@ -74,12 +79,20 @@ function query(queryText: string): Promise<any> {
       query: queryText,
       location: config.get("location"),
       maximumBytesBilled: config.get("maximumBytesBilled"),
-      useLegacySql: config.get("useLegacySql")
+      useLegacySql: config.get("useLegacySql"),
+      dryRun: !!isDryRun
     })
     .then(data => {
       let job = data[0];
       id = job.id;
-      vscode.window.showInformationMessage(`BigQuery job ID: ${job.id}`);
+      const jobIdMessage = `BigQuery job ID: ${job.id}`;
+      if (isDryRun) {
+        vscode.window.showInformationMessage(`${jobIdMessage} (dry run)`);
+        let totalBytesProcessed = job.metadata.statistics.totalBytesProcessed;
+        writeDryRunSummary(id, totalBytesProcessed);
+        return null;
+      }
+      vscode.window.showInformationMessage(jobIdMessage);
 
       return job.getQueryResults({
         autoPaginate: true
@@ -148,6 +161,13 @@ function writeResults(jobId: string, rows: Array<any>): void {
   }
 }
 
+function writeDryRunSummary(jobId: string, numBytesProcessed: string) {
+  output.show();
+  output.appendLine(`Results for job ${jobId} (dry run):`);
+  output.appendLine(`Total bytes processed: ${numBytesProcessed}`);
+  output.appendLine(``);
+}
+
 function getQueryText(
   editor: vscode.TextEditor,
   onlySelected?: boolean
@@ -188,6 +208,15 @@ function runSelectedAsQuery(): void {
     let queryText = getQueryText(vscode.window.activeTextEditor, true);
     query(queryText);
   } catch (err) {
+    vscode.window.showErrorMessage(err);
+  }
+}
+
+function dryRun(): void {
+  try {
+    let queryText = getQueryText(vscode.window.activeTextEditor);
+    query(queryText, true);
+  } catch(err) {
     vscode.window.showErrorMessage(err);
   }
 }

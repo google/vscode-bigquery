@@ -17,7 +17,8 @@
   ],
   "activationEvents": [
     "onCommand:extension.runAsQuery",
-    "onCommand:extension.runSelectedAsQuery"
+    "onCommand:extension.runSelectedAsQuery",
+    "onCommand:extension.dryRun"
   ],
   "main": "./out/extension",
   "contributes": {
@@ -29,6 +30,10 @@
       {
         "command": "extension.runSelectedAsQuery",
         "title": "BigQuery: Run selected text as Query"
+      },
+      {
+        "command": "extension.dryRun",
+        "title": "BigQuery: Run as Dry Run"
       }
     ],
     "configuration": {
