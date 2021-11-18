@@ -115,7 +115,7 @@ function query(queryText: string, isDryRun?: boolean): Promise<any> {
 }
 
 function writeResults(jobId: string, rows: Array<any>): void {
-  output.show();
+  output.show(true);
   output.appendLine(`Results for job ${jobId}:`);
 
   let format = config
