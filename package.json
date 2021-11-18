@@ -2,7 +2,7 @@
   "name": "vscode-bigquery",
   "displayName": "vscode-bigquery",
   "description": "An extension for querying Google Cloud Platform's BigQuery analytics datasets directly from VS Code.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "google",
   "repository": {
     "type": "git",
@@ -93,6 +93,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "postinstall": "node ./node_modules/vscode/bin/install",
+    "package": "vsce package",
     "test": "npm run compile && node ./node_modules/vscode/bin/test"
   },
   "devDependencies": {
@@ -100,7 +101,8 @@
     "@types/node": "^8.10.49",
     "tslint": "^5.17.0",
     "typescript": "^2.6.1",
-    "vscode": "^1.1.34"
+    "vsce": "^2.3.0",
+    "vscode": "^1.1.37"
   },
   "dependencies": {
     "@google-cloud/bigquery": "^1.3.0",
