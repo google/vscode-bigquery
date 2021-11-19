@@ -29,7 +29,7 @@ type CommandMap = Map<string, () => void>;
 let commands: CommandMap = new Map<string, () => void>([
   ["extension.runAsQuery", runAsQuery],
   ["extension.runSelectedAsQuery", runSelectedAsQuery],
-  ["extension.dryRun", dryRun]
+  ["extension.dryRun", dryRun],
 ]);
 
 export function activate(ctx: vscode.ExtensionContext) {
@@ -43,7 +43,7 @@ export function activate(ctx: vscode.ExtensionContext) {
   // Listen for configuration changes and trigger an update, so that users don't
   // have to reload the VS Code environment after a config update.
   ctx.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration(event => {
+    vscode.workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration(configPrefix)) {
         return;
       }
@@ -70,7 +70,7 @@ function query(queryText: string, isDryRun?: boolean): Promise<any> {
   let client = BigQuery({
     keyFilename: config.get("keyFilename"),
     projectId: config.get("projectId"),
-    email: config.get("email")
+    email: config.get("email"),
   });
 
   let id: string;
@@ -80,9 +80,9 @@ function query(queryText: string, isDryRun?: boolean): Promise<any> {
       location: config.get("location"),
       maximumBytesBilled: config.get("maximumBytesBilled"),
       useLegacySql: config.get("useLegacySql"),
-      dryRun: !!isDryRun
+      dryRun: !!isDryRun,
     })
-    .then(data => {
+    .then((data) => {
       let job = data[0];
       id = job.id;
       const jobIdMessage = `BigQuery job ID: ${job.id}`;
@@ -95,33 +95,30 @@ function query(queryText: string, isDryRun?: boolean): Promise<any> {
       vscode.window.showInformationMessage(jobIdMessage);
 
       return job.getQueryResults({
-        autoPaginate: true
+        autoPaginate: true,
       });
     })
-    .catch(err => {
+    .catch((err) => {
       vscode.window.showErrorMessage(`Failed to query BigQuery: ${err}`);
       return null;
     });
 
   return job
-    .then(data => {
+    .then((data) => {
       if (data) {
         writeResults(id, data[0]);
       }
     })
-    .catch(err => {
+    .catch((err) => {
       vscode.window.showErrorMessage(`Failed to get results: ${err}`);
     });
 }
 
 function writeResults(jobId: string, rows: Array<any>): void {
-  output.show(true);
+  output.show(config.get("preserveFocus"));
   output.appendLine(`Results for job ${jobId}:`);
 
-  let format = config
-    .get("outputFormat")
-    .toString()
-    .toLowerCase();
+  let format = config.get("outputFormat").toString().toLowerCase();
 
   switch (format) {
     case "csv":
@@ -136,7 +133,7 @@ function writeResults(jobId: string, rows: Array<any>): void {
       // Collect the header names; flatten nested objects into a
       // recordname.recordfield format
       let headers = [];
-      Object.keys(flatten(rows[0])).forEach(name => headers.push(name));
+      Object.keys(flatten(rows[0])).forEach((name) => headers.push(name));
 
       rows.forEach((val, idx) => {
         // Flatten each row, and for each header (name), insert the matching
@@ -153,7 +150,7 @@ function writeResults(jobId: string, rows: Array<any>): void {
       break;
     default:
       let spacing = config.get("prettyPrintJSON") ? "  " : "";
-      rows.forEach(row => {
+      rows.forEach((row) => {
         output.appendLine(
           JSON.stringify(flatten(row, { safe: true }), null, spacing)
         );
@@ -162,7 +159,7 @@ function writeResults(jobId: string, rows: Array<any>): void {
 }
 
 function writeDryRunSummary(jobId: string, numBytesProcessed: string) {
-  output.show();
+  output.show(config.get("preserveFocus"));
   output.appendLine(`Results for job ${jobId} (dry run):`);
   output.appendLine(`Total bytes processed: ${numBytesProcessed}`);
   output.appendLine(``);
@@ -216,7 +213,7 @@ function dryRun(): void {
   try {
     let queryText = getQueryText(vscode.window.activeTextEditor);
     query(queryText, true);
-  } catch(err) {
+  } catch (err) {
     vscode.window.showErrorMessage(err);
   }
 }
