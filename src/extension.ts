@@ -99,7 +99,8 @@ function query(queryText: string, isDryRun?: boolean): Promise<any> {
       });
     })
     .catch((err) => {
-      vscode.window.showErrorMessage(`Failed to query BigQuery: ${err}`);
+      output.show(config.get("preserveFocus"));
+      output.appendLine(`Failed to query BigQuery: ${err}`);
       return null;
     });
 
@@ -110,7 +111,8 @@ function query(queryText: string, isDryRun?: boolean): Promise<any> {
       }
     })
     .catch((err) => {
-      vscode.window.showErrorMessage(`Failed to get results: ${err}`);
+      output.show(config.get("preserveFocus"));
+      output.appendLine(`Failed to get results: ${err}`);
     });
 }
 
