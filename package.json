@@ -2,7 +2,7 @@
   "name": "vscode-bigquery",
   "displayName": "vscode-bigquery",
   "description": "An extension for querying Google Cloud Platform's BigQuery analytics datasets directly from VS Code.",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "google",
   "repository": {
     "type": "git",
@@ -50,11 +50,6 @@
           "default": "",
           "description": "(Optional) The project ID from the Google Developer's Console, e.g. 'grape-spaceship-123'. This is NOT needed if you are provide a key in JSON format"
         },
-        "bigquery.email": {
-          "type": "string",
-          "default": "",
-          "description": "(Optional) Account email address. Required when using a .pem or .p12 keyFilename."
-        },
         "bigquery.useLegacySql": {
           "type": "boolean",
           "default": false,
@@ -66,9 +61,14 @@
           "description": "The geographic location of the job. Required except for US and EU. See details at https://cloud.google.com/bigquery/docs/dataset-locations#specifying_your_location."
         },
         "bigquery.maximumBytesBilled": {
-          "type": "integer",
-          "default": 1000000000000,
+          "type": "string",
+          "default": "1000000000000",
           "description": "Queries that will have bytes billed beyond this limit will fail (without incurring a charge). If unspecified, this will be set to your project default."
+        },
+        "bigquery.preserveFocus": {
+          "type": "boolean",
+          "default": true,
+          "description": "Preserve focus when opening output window."
         },
         "bigquery.outputFormat": {
           "type": "string",
@@ -97,16 +97,21 @@
     "test": "npm run compile && node ./node_modules/vscode/bin/test"
   },
   "dependencies": {
-    "@google-cloud/bigquery": "^1.3.0",
-    "csv-stringify": "^4.3.1",
-    "easy-table": "^1.1.1",
-    "flat": "^4.1.0"
+    "@google-cloud/bigquery": "^5.9.2",
+    "csv-stringify": "^6.0.4",
+    "easy-table": "^1.2.0",
+    "flat": "^5.0.2",
+    "tenderizer": "^0.0.5"
   },
   "devDependencies": {
-    "@types/mocha": "^2.2.42",
-    "@types/node": "^8.10.49",
+    "@types/csv-stringify": "^3.1.0",
+    "@types/easy-table": "^1.2.0",
+    "@types/flat": "^5.0.2",
+    "@types/jest": "^27.0.3",
+    "@types/mocha": "^9.0.0",
+    "@types/node": "^16.11.9",
     "tslint": "^5.17.0",
-    "typescript": "^2.6.1",
+    "typescript": "^4.5.2",
     "vsce": "^2.3.0",
     "vscode": "^1.1.37"
   }

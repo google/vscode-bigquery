@@ -14,144 +14,219 @@
 
 "use strict";
 import * as vscode from "vscode";
-const BigQuery = require("@google-cloud/bigquery");
-const toCSV = require("csv-stringify");
-const easyTable = require("easy-table");
-const flatten = require("flat");
+import { BigQuery } from "@google-cloud/bigquery";
+import { stringify as toCSV } from "csv-stringify";
+import EasyTable from "easy-table";
+import { tenderize } from "tenderizer";
+import { flatten } from "flat";
 
-const configPrefix = "bigquery";
-let config: vscode.WorkspaceConfiguration;
-let output = vscode.window.createOutputChannel("BigQuery");
+type Output = {
+  show: (preserveFocus: boolean) => void;
+  appendLine: (value: string) => void;
+};
 
-// CommandMap describes a map of extension commands (defined in package.json)
-// and the function they invoke.
-type CommandMap = Map<string, () => void>;
-let commands: CommandMap = new Map<string, () => void>([
-  ["extension.runAsQuery", runAsQuery],
-  ["extension.runSelectedAsQuery", runSelectedAsQuery],
-  ["extension.dryRun", dryRun],
-]);
+type Config = {
+  keyFilename: string;
+  projectId: string;
+  useLegacySql: boolean;
+  location: string;
+  maximumBytesBilled?: string;
+  preserveFocus: boolean;
+  outputFormat: OutputFormat;
+  prettyPrintJSON: boolean;
+};
 
-export function activate(ctx: vscode.ExtensionContext) {
-  config = readConfig();
+type OutputFormat = "json" | "csv" | "table";
 
-  // Register all available commands and their actions.
-  commands.forEach((action, name) => {
-    ctx.subscriptions.push(vscode.commands.registerCommand(name, action));
-  });
+export async function activate(ctx: vscode.ExtensionContext) {
+  try {
+    const configSection = "bigquery";
+    const config: Config = {
+      keyFilename: "",
+      projectId: "",
+      useLegacySql: false,
+      location: "US",
+      preserveFocus: true,
+      outputFormat: "json",
+      prettyPrintJSON: true,
+    };
+    await readConfig(configSection, config);
 
-  // Listen for configuration changes and trigger an update, so that users don't
-  // have to reload the VS Code environment after a config update.
-  ctx.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration((event) => {
-      if (!event.affectsConfiguration(configPrefix)) {
-        return;
-      }
+    // Register all available commands and their actions.
+    // CommandMap describes a map of extension commands (defined in package.json)
+    // and the function they invoke.
+    new Map<string, () => void>([
+      ["extension.runAsQuery", wrap(runAsQuery, config)],
+      ["extension.runSelectedAsQuery", wrap(runSelectedAsQuery, config)],
+      ["extension.dryRun", wrap(dryRun, config)],
+    ]).forEach((action, name) => {
+      ctx.subscriptions.push(vscode.commands.registerCommand(name, action));
+    });
 
-      config = readConfig();
-    })
-  );
+    // Listen for configuration changes and trigger an update, so that users don't
+    // have to reload the VS Code environment after a config update.
+    ctx.subscriptions.push(
+      vscode.workspace.onDidChangeConfiguration(async (event) => {
+        if (!event.affectsConfiguration(configSection)) {
+          return;
+        }
+
+        await readConfig(configSection, config);
+      })
+    );
+  } catch (err) {
+    vscode.window.showErrorMessage(`${err}`);
+  }
 }
 
-//
-function readConfig(): vscode.WorkspaceConfiguration {
+export function deactivate() {}
+
+async function readConfig(section: string, config: Config): Promise<void> {
   try {
-    return vscode.workspace.getConfiguration(configPrefix);
+    const c = vscode.workspace.getConfiguration(section);
+    config.keyFilename = c.get<string>("keyFilename") ?? config.keyFilename;
+    config.projectId = c.get<string>("projectId") ?? config.projectId;
+    config.useLegacySql = c.get<boolean>("useLegacySql") ?? config.useLegacySql;
+    config.location = c.get<string>("location") ?? config.location;
+    config.maximumBytesBilled =
+      c.get<string>("maximumBytesBilled") ?? config.maximumBytesBilled;
+    config.preserveFocus =
+      c.get<boolean>("preserveFocus") ?? config.preserveFocus;
+    config.outputFormat =
+      c.get<OutputFormat>("outputFormat") ?? config.outputFormat;
+    config.prettyPrintJSON =
+      c.get<boolean>("prettyPrintJSON") ?? config.prettyPrintJSON;
   } catch (e) {
-    vscode.window.showErrorMessage(`failed to read config: ${e}`);
+    throw new Error(`failed to read config: ${e}`);
   }
+}
+
+function wrap(
+  fn: (
+    editor: vscode.TextEditor,
+    config: Config,
+    output: vscode.OutputChannel
+  ) => void,
+  config: Config
+): () => void {
+  const output = vscode.window.createOutputChannel("BigQuery");
+  return () => {
+    try {
+      if (!vscode.window.activeTextEditor) {
+        throw new Error("no active text editor");
+      }
+      fn(vscode.window.activeTextEditor, config, output);
+    } catch (err) {
+      vscode.window.showErrorMessage(`${err}`);
+    }
+  };
+}
+
+function runAsQuery(
+  textEditor: vscode.TextEditor,
+  config: Config,
+  output: Output
+): void {
+  query(getQueryText(textEditor), config, output);
+}
+
+function runSelectedAsQuery(
+  textEditor: vscode.TextEditor,
+  config: Config,
+  output: vscode.OutputChannel
+): void {
+  query(getQueryText(textEditor, true), config, output);
+}
+
+function dryRun(
+  textEditor: vscode.TextEditor,
+  config: Config,
+  output: vscode.OutputChannel
+): void {
+  query(getQueryText(textEditor), config, output, true);
 }
 
 /**
  * @param queryText
  * @param isDryRun Defaults to False.
  */
-function query(queryText: string, isDryRun?: boolean): Promise<any> {
-  let client = BigQuery({
-    keyFilename: config.get("keyFilename"),
-    projectId: config.get("projectId"),
-    email: config.get("email"),
+async function query(
+  queryText: string,
+  config: Config,
+  output: Output,
+  isDryRun?: boolean
+): Promise<any> {
+  let client = new BigQuery({
+    keyFilename: config.keyFilename,
+    projectId: config.projectId,
   });
 
-  let id: string;
-  let job = client
-    .createQueryJob({
+  try {
+    const data = await client.createQueryJob({
       query: queryText,
-      location: config.get("location"),
-      maximumBytesBilled: config.get("maximumBytesBilled"),
-      useLegacySql: config.get("useLegacySql"),
+      location: config.location,
+      maximumBytesBilled: config.maximumBytesBilled,
+      useLegacySql: config.useLegacySql,
       dryRun: !!isDryRun,
-    })
-    .then((data) => {
-      let job = data[0];
-      id = job.id;
-      const jobIdMessage = `BigQuery job ID: ${job.id}`;
-      if (isDryRun) {
-        vscode.window.showInformationMessage(`${jobIdMessage} (dry run)`);
-        let totalBytesProcessed = job.metadata.statistics.totalBytesProcessed;
-        writeDryRunSummary(id, totalBytesProcessed);
-        return null;
-      }
-      vscode.window.showInformationMessage(jobIdMessage);
+    });
 
-      return job.getQueryResults({
+    const job = data[0];
+    const id = job.id;
+    if (!id) {
+      throw new Error(`no job ID`);
+    }
+    const jobIdMessage = `BigQuery job ID: ${job.id}`;
+    if (isDryRun) {
+      vscode.window.showInformationMessage(`${jobIdMessage} (dry run)`);
+      let totalBytesProcessed = job.metadata.statistics.totalBytesProcessed;
+      writeDryRunSummary(id, totalBytesProcessed, config, output);
+      return null;
+    }
+    vscode.window.showInformationMessage(jobIdMessage);
+
+    try {
+      const d = await job.getQueryResults({
         autoPaginate: true,
       });
-    })
-    .catch((err) => {
-      output.show(config.get("preserveFocus"));
-      output.appendLine(`Failed to query BigQuery: ${err}`);
-      return null;
-    });
-
-  return job
-    .then((data) => {
-      if (data) {
-        writeResults(id, data[0]);
+      if (d) {
+        writeResults(id, d[0], config, output);
       }
-    })
-    .catch((err) => {
-      output.show(config.get("preserveFocus"));
+    } catch (err) {
+      output.show(config.preserveFocus);
       output.appendLine(`Failed to get results: ${err}`);
-    });
+    }
+  } catch (err) {
+    output.show(config.preserveFocus);
+    output.appendLine(`Failed to query BigQuery: ${err}`);
+    return null;
+  }
 }
 
-function writeResults(jobId: string, rows: Array<any>): void {
-  output.show(config.get("preserveFocus"));
+function writeResults(
+  jobId: string,
+  rows: Array<any>,
+  config: Config,
+  output: Output
+): void {
+  output.show(config.preserveFocus);
   output.appendLine(`Results for job ${jobId}:`);
 
-  let format = config.get("outputFormat").toString().toLowerCase();
+  let format = config.outputFormat.toString().toLowerCase();
 
   switch (format) {
     case "csv":
-      toCSV(rows, (err, res) => {
-        output.appendLine(res);
+      toCSV(rows, (err?: Error, res?: string) => {
+        if (res) {
+          output.appendLine(res);
+        }
       });
 
       break;
     case "table":
-      let t = new easyTable();
-
-      // Collect the header names; flatten nested objects into a
-      // recordname.recordfield format
-      let headers = [];
-      Object.keys(flatten(rows[0])).forEach((name) => headers.push(name));
-
-      rows.forEach((val, idx) => {
-        // Flatten each row, and for each header (name), insert the matching
-        // object property (v[name])
-        let v = flatten(val, { safe: true });
-        headers.forEach((name, col) => {
-          t.cell(name, v[name]);
-        });
-        t.newRow();
-      });
-
-      output.appendLine(t.toString());
-
+      output.appendLine(table(rows));
       break;
     default:
-      let spacing = config.get("prettyPrintJSON") ? "  " : "";
+      let spacing = config.prettyPrintJSON ? "  " : "";
       rows.forEach((row) => {
         output.appendLine(
           JSON.stringify(flatten(row, { safe: true }), null, spacing)
@@ -160,8 +235,24 @@ function writeResults(jobId: string, rows: Array<any>): void {
   }
 }
 
-function writeDryRunSummary(jobId: string, numBytesProcessed: string) {
-  output.show(config.get("preserveFocus"));
+export function table(rows: Array<any>): string {
+  const t = new EasyTable();
+  rows.forEach((row) => {
+    tenderize(row).forEach((o) => {
+      Object.keys(o).forEach((key) => t.cell(key, o[key]));
+      t.newRow();
+    });
+  });
+  return t.toString();
+}
+
+function writeDryRunSummary(
+  jobId: string,
+  numBytesProcessed: string,
+  config: Config,
+  output: Output
+) {
+  output.show(config.preserveFocus);
   output.appendLine(`Results for job ${jobId} (dry run):`);
   output.appendLine(`Total bytes processed: ${numBytesProcessed}`);
   output.appendLine(``);
@@ -192,32 +283,3 @@ function getQueryText(
 
   return text;
 }
-
-function runAsQuery(): void {
-  try {
-    let queryText = getQueryText(vscode.window.activeTextEditor);
-    query(queryText);
-  } catch (err) {
-    vscode.window.showErrorMessage(err);
-  }
-}
-
-function runSelectedAsQuery(): void {
-  try {
-    let queryText = getQueryText(vscode.window.activeTextEditor, true);
-    query(queryText);
-  } catch (err) {
-    vscode.window.showErrorMessage(err);
-  }
-}
-
-function dryRun(): void {
-  try {
-    let queryText = getQueryText(vscode.window.activeTextEditor);
-    query(queryText, true);
-  } catch (err) {
-    vscode.window.showErrorMessage(err);
-  }
-}
-
-export function deactivate() {}
